@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Valenzza: controle de estoque (protótipo)</title>
+<style>
+:root{--bg:#f4f6f9;--surface:#ffffff;--text:#1b1b1b;--muted:#4a5565;--border:#5f6b7a;--primary:#1a4d8f;--on-primary:#ffffff;--err:#9b1c1c;--err-bg:#fdecec;--ok:#14532d;--ok-bg:#e8f5ec;--warn-bg:#fff3cd;--warn-text:#4a3000;--warn-border:#8a5a00;--focus:#111111;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151c;--surface:#1a212b;--text:#f1f3f5;--muted:#b8c0cc;--border:#9aa6b5;--primary:#8ab4f8;--on-primary:#0b1220;--err:#ffb4b4;--err-bg:#3a1a1a;--ok:#9ae6b4;--ok-bg:#16301f;--warn-bg:#3d2f00;--warn-text:#ffe9a6;--warn-border:#e0b04a;--focus:#ffffff}}
+:root[data-theme="dark"]{--bg:#10151c;--surface:#1a212b;--text:#f1f3f5;--muted:#b8c0cc;--border:#9aa6b5;--primary:#8ab4f8;--on-primary:#0b1220;--err:#ffb4b4;--err-bg:#3a1a1a;--ok:#9ae6b4;--ok-bg:#16301f;--warn-bg:#3d2f00;--warn-text:#ffe9a6;--warn-border:#e0b04a;--focus:#ffffff}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+header{background:var(--surface);border-bottom:2px solid var(--border);padding:12px 24px;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center}
+.brand{font-weight:700;font-size:1.25rem}
+.who{display:flex;gap:12px;align-items:center}
+.who form{margin:0}
+main,footer{max-width:960px;margin:0 auto;padding:24px}
+main.narrow{max-width:520px;margin:0 auto}
+footer{border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+h1{font-size:1.5rem;margin:0 0 16px}
+label{display:block;font-weight:600;margin:16px 0 4px}
+input,select{width:100%;min-height:44px;padding:8px 12px;font:inherit;color:var(--text);background:var(--surface);border:2px solid var(--border);border-radius:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;min-width:44px;padding:8px 20px;font:inherit;font-weight:700;color:var(--on-primary);background:var(--primary);border:2px solid var(--primary);border-radius:6px;text-decoration:none;cursor:pointer;margin-top:20px}
+.btn.sec{background:transparent;color:var(--primary);margin-top:0}
+.btn.big{min-height:72px;font-size:1.125rem;margin-top:0;justify-content:flex-start;padding:12px 20px}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:16px}
+.msg{padding:12px 16px;border-radius:6px;border:2px solid;margin:12px 0;font-weight:600}
+.err{color:var(--err);background:var(--err-bg);border-color:var(--err)}
+.okm{color:var(--ok);background:var(--ok-bg);border-color:var(--ok)}
+.warn{color:var(--warn-text);background:var(--warn-bg);border-color:var(--warn-border)}
+.msg a{color:inherit}
+.note{color:var(--muted);font-size:.9375rem;margin:8px 0 0}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end}
+.filters label{margin-top:0}
+.filters .btn{margin-top:0}
+.scroll{overflow-x:auto;background:var(--surface);border:2px solid var(--border);border-radius:6px;margin-top:20px}
+table{border-collapse:collapse;width:100%;min-width:560px}
+caption{text-align:left;font-weight:700;padding:12px 16px}
+th,td{padding:12px 16px;text-align:left;border-top:1px solid var(--border)}
+th{background:var(--bg)}
+td.n{font-variant-numeric:tabular-nums}
+.low td{background:var(--warn-bg);color:var(--warn-text)}
+.badge{font-weight:700}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+var S0=[7,2,12,3,9,15];
+var P=[["Camiseta básica","M","Preta",7,3],["Camiseta básica","G","Branca",2,3],["Calça jeans","40","Azul",12,4],["Vestido midi","P","Verde",3,3],["Bermuda","42","Bege",9,3],["Blusa manga longa","M","Branca",15,5]];
+var ok="",did=false;
+var $=function(s){return document.querySelector(s)};
+var esc=function(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})};
+var nome=function(p){return esc(p[0])+" · "+esc(p[1])+" · "+esc(p[2])};
+var low=function(p){return p[4]>0&&p[3]<=p[4]};
+function hdr(l){return '<header><div class="brand">📦 Valenzza: controle de estoque</div>'+(l?'<div class="who"><span>Olá, usuário demo</span><form onsubmit="nav(\'login\');return false"><button class="btn sec" type="submit">Sair</button></form></div>':'')+'</header>'}
+var ftr='<footer><a class="btn sec" href="#menu">Voltar ao menu</a><p class="note">Protótipo com dados fictícios</p></footer>';
+function vLogin(err){return '<main class="narrow"><h1>Entrar</h1>'+(err?'<p class="msg err" role="alert"><span aria-hidden="true">✖</span> Usuário ou senha incorretos. Confira os dados e tente de novo.</p>':'')+'<form id="f"><label for="u">Usuário</label><input id="u" autocomplete="username" value="'+(err?'usuario.demo':'')+'"><label for="s">Senha</label><input id="s" type="password" autocomplete="current-password"><button class="btn" type="submit">Entrar</button></form><p class="note">Esqueceu a senha? Fale com o responsável pelo sistema.</p></main>'}
+function vMenu(){var n=P.filter(low).length;return '<main><h1>Menu inicial</h1><p>O que você quer fazer?</p>'+(n?'<p class="msg warn"><span aria-hidden="true">⚠</span> '+n+' peças com estoque baixo: <a href="#consulta">ver</a></p>':'')+'<nav class="grid" aria-label="Funções do sistema"><a class="btn big" href="#saida"><span aria-hidden="true">🧾</span> Registrar saída (venda)</a><a class="btn big" href="#fora"><span aria-hidden="true">📥</span> Registrar entrada</a><a class="btn big" href="#consulta"><span aria-hidden="true">🔎</span> Consultar estoque</a><a class="btn big" href="#fora"><span aria-hidden="true">➕</span> Cadastrar peça</a></nav></main>'}
+function vFora(){return '<main class="narrow"><h1>Fora do protótipo</h1><p class="msg warn"><span aria-hidden="true">⚠</span> Esta tela não faz parte do protótipo.</p></main>'+ftr}
+function vSaida(m){var e=m==="erro";return '<main class="narrow"><h1>Registrar saída (venda)</h1>'+(m==="ok"?'<p class="msg okm" role="status"><span aria-hidden="true">✔</span> '+ok+'</p>':'')+'<form id="f"><label for="p">Peça</label><select id="p">'+P.map(function(p,i){return '<option value="'+i+'">'+nome(p)+' (estoque: '+p[3]+')</option>'}).join("")+'</select><label for="q">Quantidade</label><input id="q" type="number" min="1" inputmode="numeric" value="'+(e?8:'')+'"'+(e?' aria-invalid="true" aria-describedby="e"':'')+'>'+(e?'<p id="e" class="msg err" role="alert">✖ Quantidade maior que o estoque disponível (7). Informe até 7.</p>':'<p id="e"></p>')+'<label for="o">Observação (opcional)</label><input id="o" maxlength="200" aria-describedby="oh"><p id="oh" class="note">Não escreva nome nem telefone de clientes.</p><button class="btn" type="submit">Registrar saída</button></form></main>'+ftr}
+function opts(i){var s=[];P.forEach(function(p){if(s.indexOf(p[i])<0)s.push(p[i])});return '<option value="">Todos</option>'+s.map(function(v){return '<option>'+esc(v)+'</option>'}).join("")}
+function vConsulta(){return '<main><h1>Consultar estoque</h1><form id="f" class="filters"><div><label for="b">Buscar por modelo</label><input id="b" type="search"></div><div><label for="t">Tamanho</label><select id="t">'+opts(1)+'</select></div><div><label for="c">Cor</label><select id="c">'+opts(2)+'</select></div><button class="btn" type="submit">Filtrar</button></form><div class="scroll" role="region" aria-label="Tabela de estoque" tabindex="0"><table><caption id="cap"></caption><thead><tr><th scope="col">Modelo</th><th scope="col">Tamanho</th><th scope="col">Cor</th><th scope="col">Quantidade</th><th scope="col">Situação</th></tr></thead><tbody id="tb"></tbody></table></div><p class="note">Página 1 de 1</p></main>'+ftr}
+function fil(){var b=$("#b").value.toLowerCase(),t=$("#t").value,c=$("#c").value;var L=P.filter(function(p){return p[0].toLowerCase().indexOf(b)>=0&&(!t||p[1]===t)&&(!c||p[2]===c)});var sum=L.reduce(function(a,p){return a+p[3]},0);$("#cap").textContent=L.length===P.length?"Estoque atual: "+P.length+" peças cadastradas ("+sum+" unidades)":L.length+" de "+P.length+" peças exibidas ("+sum+" unidades)";$("#tb").innerHTML=L.length?L.map(function(p){var l=low(p);return '<tr'+(l?' class="low"':'')+'><td>'+esc(p[0])+'</td><td>'+esc(p[1])+'</td><td>'+esc(p[2])+'</td><td class="n">'+p[3]+'</td><td>'+(l?'<span class="badge"><span aria-hidden="true">⚠</span> Estoque baixo</span>':'Normal')+'</td></tr>'}).join(""):'<tr><td colspan="5">Nenhuma peça encontrada. Limpe os filtros para ver todas.</td></tr>'}
+var cur=location.hash.slice(1)||"login";
+function nav(h){cur=h;try{history.replaceState(null,"","#"+h)}catch(e){}go()}
+function go(){var h=cur,l=true,v;
+if(h==="login"||h==="login-erro"){l=false;did=false;P.forEach(function(p,i){p[3]=S0[i]})}
+if(h==="saida-erro")P[0][3]=7;
+if((h==="saida-ok"||h==="consulta")&&!did&&P[0][3]===7){P[0][3]=5;ok="Saída registrada. Estoque atual de "+nome(P[0])+": 5"}
+if(h==="login")v=vLogin(false);else if(h==="login-erro")v=vLogin(true);else if(h==="menu")v=vMenu();else if(h==="saida")v=vSaida("");else if(h==="saida-erro")v=vSaida("erro");else if(h==="saida-ok")v=vSaida("ok");else if(h==="consulta")v=vConsulta();else v=vFora();
+$("#app").innerHTML=hdr(l)+v;
+document.title="Valenzza: controle de estoque (protótipo)";
+var f=$("#f");
+if(h==="login"||h==="login-erro"){f.onsubmit=function(ev){ev.preventDefault();nav($("#s").value?"menu":"login-erro")};(h==="login-erro"?$("#s"):$("#u")).focus()}
+if(h==="saida"||h==="saida-erro"||h==="saida-ok"){
+ f.onsubmit=function(ev){ev.preventDefault();var i=+$("#p").value,q=+$("#q").value,e=$("#e"),n=P[i][3],m="";
+  if(!q||q<1||!Number.isInteger(q))m="Informe a quantidade (número inteiro, mínimo 1).";else if(q>n)m="Quantidade maior que o estoque disponível ("+n+"). Informe até "+n+".";
+  if(m){e.className="msg err";e.setAttribute("role","alert");e.textContent="✖ "+m;$("#q").setAttribute("aria-invalid","true");$("#q").setAttribute("aria-describedby","e");$("#q").focus();return}
+  P[i][3]=n-q;did=true;ok="Saída registrada. Estoque atual de "+nome(P[i])+": "+P[i][3];
+  nav("saida-ok")};
+ (h==="saida-erro"?$("#q"):$("#p")).focus()}
+if(h==="consulta"){f.onsubmit=function(ev){ev.preventDefault();fil()};["#b","#t","#c"].forEach(function(s){$(s).oninput=fil});fil()}
+if(h==="menu"){var a=document.querySelector(".btn.big");if(a)a.focus()}
+}
+window.addEventListener("hashchange",function(){cur=location.hash.slice(1)||"login";go()});document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest('a[href^="#"]');if(a){e.preventDefault();nav(a.getAttribute("href").slice(1))}});go();
+</script>
+</body>
+</html>
